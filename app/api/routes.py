@@ -92,6 +92,16 @@ def update_ticket(
     return ticket
 
 
+@router.delete("/tickets/{ticket_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_ticket(ticket_id: int, db: DbSession) -> None:
+    deleted = ticket_service.delete_ticket(db=db, ticket_id=ticket_id)
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Ticket not found",
+        )
+
+
 @router.post("/tickets/{ticket_id}/analyze", response_model=TicketResponse)
 def analyze_ticket(ticket_id: int, db: DbSession) -> Ticket:
     ticket = ticket_service.analyze_existing_ticket(db=db, ticket_id=ticket_id)

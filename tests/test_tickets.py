@@ -392,6 +392,41 @@ def test_update_ticket_returns_404_for_missing_ticket(client: TestClient) -> Non
     assert response.json() == {"detail": "Ticket not found"}
 
 
+def test_delete_ticket(client: TestClient) -> None:
+    ticket_id = create_ticket_for_test(
+        client=client,
+        title="Delete ticket",
+        description="Delete description",
+    )
+
+    response = client.delete(f"/tickets/{ticket_id}")
+
+    assert response.status_code == 204
+    assert response.content == b""
+
+
+def test_delete_ticket_returns_404_for_missing_ticket(client: TestClient) -> None:
+    response = client.delete("/tickets/999")
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Ticket not found"}
+
+
+def test_deleted_ticket_is_not_returned(client: TestClient) -> None:
+    ticket_id = create_ticket_for_test(
+        client=client,
+        title="Deleted ticket",
+        description="Deleted description",
+    )
+
+    delete_response = client.delete(f"/tickets/{ticket_id}")
+    get_response = client.get(f"/tickets/{ticket_id}")
+
+    assert delete_response.status_code == 204
+    assert get_response.status_code == 404
+    assert get_response.json() == {"detail": "Ticket not found"}
+
+
 @pytest.mark.parametrize(
     ("title", "description", "expected_category"),
     [

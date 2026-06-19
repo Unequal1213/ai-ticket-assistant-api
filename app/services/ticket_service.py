@@ -89,6 +89,16 @@ def update_ticket(
     return ticket
 
 
+def delete_ticket(db: Session, ticket_id: int) -> bool:
+    ticket = get_ticket(db=db, ticket_id=ticket_id)
+    if ticket is None:
+        return False
+
+    db.delete(ticket)
+    db.commit()
+    return True
+
+
 def analyze_existing_ticket(db: Session, ticket_id: int) -> Ticket | None:
     ticket = get_ticket(db=db, ticket_id=ticket_id)
     if ticket is None:
