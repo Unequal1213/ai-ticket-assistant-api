@@ -44,3 +44,14 @@ def get_ticket(ticket_id: int, db: DbSession) -> Ticket:
             detail="Ticket not found",
         )
     return ticket
+
+
+@router.post("/tickets/{ticket_id}/analyze", response_model=TicketResponse)
+def analyze_ticket(ticket_id: int, db: DbSession) -> Ticket:
+    ticket = ticket_service.analyze_existing_ticket(db=db, ticket_id=ticket_id)
+    if ticket is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Ticket not found",
+        )
+    return ticket

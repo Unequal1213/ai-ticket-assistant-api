@@ -125,3 +125,103 @@ def test_get_ticket_returns_404_for_missing_ticket(client: TestClient) -> None:
 
     assert response.status_code == 404
     assert response.json() == {"detail": "Ticket not found"}
+
+
+def create_ticket_for_analysis(
+    client: TestClient,
+    title: str,
+    description: str,
+) -> int:
+    response = client.post(
+        "/tickets",
+        json={"title": title, "description": description},
+    )
+    return int(response.json()["id"])
+
+
+@pytest.mark.parametrize(
+    ("title", "description", "expected_category"),
+    [
+        ("Login problem", "My password reset link is expired.", "authentication"),
+        ("Invoice question", "I need help with billing.", "billing"),
+        ("App crash", "The app fails with an error.", "technical"),
+        ("Feature idea", "It would be nice to export tickets.", "general"),
+    ],
+)
+def test_analyze_ticket_categories(
+    client: TestClient,
+    title: str,
+    description: str,
+    expected_category: str,
+) -> None:
+    ticket_id = create_ticket_for_analysis(
+        client=client,
+        title=title,
+        description=description,
+    )
+
+    response = client.post(f"/tickets/{ticket_id}/analyze")
+
+    assert response.status_code == 200
+    assert response.json()["category"] == expected_category
+
+
+@pytest.mark.parametrize(
+    ("title", "description", "expected_priority"),
+    [
+        ("Critical outage", "The service is down.", "high"),
+        ("Need help", "Please help with this problem.", "medium"),
+        ("Question", "I want to update my profile.", "low"),
+    ],
+)
+def test_analyze_ticket_priorities(
+    client: TestClient,
+    title: str,
+    description: str,
+    expected_priority: str,
+) -> None:
+    ticket_id = create_ticket_for_analysis(
+        client=client,
+        title=title,
+        description=description,
+    )
+
+    response = client.post(f"/tickets/{ticket_id}/analyze")
+
+    assert response.status_code == 200
+    assert response.json()["priority"] == expected_priority
+
+
+def test_analyze_ticket_returns_404_for_missing_ticket(client: TestClient) -> None:
+    response = client.post("/tickets/999/analyze")
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Ticket not found"}
+
+
+def test_analyze_ticket_updates_ticket_fields(client: TestClient) -> None:
+    ticket_id = create_ticket_for_analysis(
+        client=client,
+        title="Payment failed",
+        description="Please help, my invoice payment failed.",
+    )
+
+    analyze_response = client.post(f"/tickets/{ticket_id}/analyze")
+    get_response = client.get(f"/tickets/{ticket_id}")
+
+    assert analyze_response.status_code == 200
+    analyzed_ticket = analyze_response.json()
+    saved_ticket = get_response.json()
+    assert analyzed_ticket["category"] == "billing"
+    assert analyzed_ticket["priority"] == "medium"
+    assert analyzed_ticket["summary"] == (
+        "Payment failed: Please help, my invoice payment failed."
+    )
+    assert analyzed_ticket["suggested_reply"] == (
+        "Thanks for contacting support. We classified this as a medium priority "
+        "billing issue and will review it shortly."
+    )
+    assert saved_ticket["category"] == analyzed_ticket["category"]
+    assert saved_ticket["priority"] == analyzed_ticket["priority"]
+    assert saved_ticket["summary"] == analyzed_ticket["summary"]
+    assert saved_ticket["suggested_reply"] == analyzed_ticket["suggested_reply"]
