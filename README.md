@@ -11,6 +11,30 @@ The AI-style analysis is intentionally deterministic and local. It does not use
 OpenAI or any external API, so the project can be tested and reviewed without
 API keys or network-dependent AI services.
 
+## Screenshots
+
+### Swagger API Overview
+
+FastAPI's interactive Swagger UI shows the available health, ticket CRUD, and
+analysis endpoints.
+
+![Swagger API overview](docs/images/swagger-overview.png)
+
+### Create Ticket Example
+
+The `POST /tickets` endpoint accepts a title and description, then returns the
+newly created ticket.
+
+![Create ticket request example](docs/images/create-ticket-example.png)
+
+### Deterministic Ticket Analysis Example
+
+The `POST /tickets/{ticket_id}/analyze` endpoint applies local rule-based
+analysis and updates the ticket with category, priority, summary, and suggested
+reply fields.
+
+![Analyze ticket request example](docs/images/analyze-ticket-example.png)
+
 ## Features
 
 - Health check endpoint for service monitoring.
