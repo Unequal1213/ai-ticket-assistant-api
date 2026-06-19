@@ -290,6 +290,108 @@ def test_get_ticket_returns_404_for_missing_ticket(client: TestClient) -> None:
     assert response.json() == {"detail": "Ticket not found"}
 
 
+def test_update_ticket_title(client: TestClient) -> None:
+    ticket_id = create_ticket_for_test(
+        client=client,
+        title="Original title",
+        description="Original description",
+    )
+
+    response = client.patch(
+        f"/tickets/{ticket_id}",
+        json={"title": "Updated title"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["title"] == "Updated title"
+    assert data["description"] == "Original description"
+
+
+def test_update_ticket_status(client: TestClient) -> None:
+    ticket_id = create_ticket_for_test(
+        client=client,
+        title="Status ticket",
+        description="Status description",
+    )
+
+    response = client.patch(
+        f"/tickets/{ticket_id}",
+        json={"status": "in_progress"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "in_progress"
+
+
+def test_update_ticket_preserves_omitted_fields(client: TestClient) -> None:
+    ticket_id = create_ticket_for_test(
+        client=client,
+        title="Preserved title",
+        description="Preserved description",
+    )
+    client.patch(
+        f"/tickets/{ticket_id}",
+        json={
+            "status": "open",
+            "category": "general",
+            "priority": "low",
+            "summary": "Existing summary",
+            "suggested_reply": "Existing reply",
+        },
+    )
+
+    response = client.patch(
+        f"/tickets/{ticket_id}",
+        json={"description": "Updated description"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["title"] == "Preserved title"
+    assert data["description"] == "Updated description"
+    assert data["status"] == "open"
+    assert data["category"] == "general"
+    assert data["priority"] == "low"
+    assert data["summary"] == "Existing summary"
+    assert data["suggested_reply"] == "Existing reply"
+
+
+def test_update_ticket_ai_fields(client: TestClient) -> None:
+    ticket_id = create_ticket_for_test(
+        client=client,
+        title="AI fields",
+        description="AI field description",
+    )
+
+    response = client.patch(
+        f"/tickets/{ticket_id}",
+        json={
+            "category": "technical",
+            "priority": "high",
+            "summary": "Manual summary",
+            "suggested_reply": "Manual suggested reply",
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["category"] == "technical"
+    assert data["priority"] == "high"
+    assert data["summary"] == "Manual summary"
+    assert data["suggested_reply"] == "Manual suggested reply"
+
+
+def test_update_ticket_returns_404_for_missing_ticket(client: TestClient) -> None:
+    response = client.patch(
+        "/tickets/999",
+        json={"title": "Missing ticket"},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Ticket not found"}
+
+
 @pytest.mark.parametrize(
     ("title", "description", "expected_category"),
     [

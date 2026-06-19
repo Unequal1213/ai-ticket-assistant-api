@@ -8,6 +8,16 @@ class TicketCreate(BaseModel):
     description: str = Field(min_length=1)
 
 
+class TicketUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=255)
+    description: str | None = Field(default=None, min_length=1)
+    status: str | None = Field(default=None, min_length=1, max_length=50)
+    category: str | None = Field(default=None, min_length=1, max_length=100)
+    priority: str | None = Field(default=None, min_length=1, max_length=50)
+    summary: str | None = Field(default=None, min_length=1)
+    suggested_reply: str | None = Field(default=None, min_length=1)
+
+
 class TicketResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

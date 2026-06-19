@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.schemas.ticket import TicketCreate
+from app.schemas.ticket import TicketCreate, TicketUpdate
 from app.services.ticket_analyzer import analyze_ticket
 
 if TYPE_CHECKING:
@@ -69,6 +69,24 @@ def get_ticket(db: Session, ticket_id: int) -> Ticket | None:
     from app.models.ticket import Ticket
 
     return db.get(Ticket, ticket_id)
+
+
+def update_ticket(
+    db: Session,
+    ticket_id: int,
+    ticket_data: TicketUpdate,
+) -> Ticket | None:
+    ticket = get_ticket(db=db, ticket_id=ticket_id)
+    if ticket is None:
+        return None
+
+    update_data = ticket_data.model_dump(exclude_unset=True)
+    for field_name, value in update_data.items():
+        setattr(ticket, field_name, value)
+
+    db.commit()
+    db.refresh(ticket)
+    return ticket
 
 
 def analyze_existing_ticket(db: Session, ticket_id: int) -> Ticket | None:
