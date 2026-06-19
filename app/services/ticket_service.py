@@ -25,10 +25,44 @@ def create_ticket(db: Session, ticket_data: TicketCreate) -> Ticket:
     return ticket
 
 
-def list_tickets(db: Session) -> list[Ticket]:
+def list_tickets(
+    db: Session,
+    limit: int = 20,
+    offset: int = 0,
+    status: str | None = None,
+    category: str | None = None,
+    priority: str | None = None,
+    sort_by: str = "created_at",
+    sort_order: str = "desc",
+) -> list[Ticket]:
     from app.models.ticket import Ticket
 
-    return list(db.scalars(select(Ticket).order_by(Ticket.id)).all())
+    sort_columns = {
+        "created_at": Ticket.created_at,
+        "updated_at": Ticket.updated_at,
+        "title": Ticket.title,
+        "status": Ticket.status,
+        "category": Ticket.category,
+        "priority": Ticket.priority,
+    }
+    sort_column = sort_columns[sort_by]
+    sort_direction = sort_order.lower()
+    order_by = sort_column.asc() if sort_direction == "asc" else sort_column.desc()
+    secondary_order = Ticket.id.asc() if sort_direction == "asc" else Ticket.id.desc()
+
+    statement = select(Ticket)
+    if status is not None:
+        statement = statement.where(Ticket.status == status)
+    if category is not None:
+        statement = statement.where(Ticket.category == category)
+    if priority is not None:
+        statement = statement.where(Ticket.priority == priority)
+
+    statement = (
+        statement.order_by(order_by, secondary_order).offset(offset).limit(limit)
+    )
+
+    return list(db.scalars(statement).all())
 
 
 def get_ticket(db: Session, ticket_id: int) -> Ticket | None:

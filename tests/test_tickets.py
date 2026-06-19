@@ -1,6 +1,7 @@
 import importlib
 import sys
 from collections.abc import Generator
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
@@ -41,6 +42,7 @@ def client(monkeypatch: pytest.MonkeyPatch) -> Generator[TestClient]:
         bind=engine,
         class_=Session,
     )
+    app.state.testing_session_local = testing_session_local
     database_module.Base.metadata.create_all(bind=engine)
 
     def override_get_db() -> Generator[Session]:
@@ -57,8 +59,34 @@ def client(monkeypatch: pytest.MonkeyPatch) -> Generator[TestClient]:
             yield test_client
     finally:
         app.dependency_overrides.clear()
+        del app.state.testing_session_local
         database_module.Base.metadata.drop_all(bind=engine)
         clear_database_modules()
+
+
+def create_ticket_for_test(
+    client: TestClient,
+    title: str,
+    description: str,
+) -> int:
+    response = client.post(
+        "/tickets",
+        json={"title": title, "description": description},
+    )
+    assert response.status_code == 201
+    return int(response.json()["id"])
+
+
+def update_ticket_fields(ticket_id: int, **fields: Any) -> None:
+    ticket_module = importlib.import_module("app.models.ticket")
+
+    session_local = app.state.testing_session_local
+    with session_local() as db:
+        ticket = db.get(ticket_module.Ticket, ticket_id)
+        assert ticket is not None
+        for field_name, value in fields.items():
+            setattr(ticket, field_name, value)
+        db.commit()
 
 
 def test_create_ticket(client: TestClient) -> None:
@@ -84,14 +112,16 @@ def test_create_ticket(client: TestClient) -> None:
     assert data["updated_at"]
 
 
-def test_list_tickets(client: TestClient) -> None:
-    client.post(
-        "/tickets",
-        json={"title": "First ticket", "description": "First description"},
+def test_list_tickets_default_behavior(client: TestClient) -> None:
+    create_ticket_for_test(
+        client=client,
+        title="First ticket",
+        description="First description",
     )
-    client.post(
-        "/tickets",
-        json={"title": "Second ticket", "description": "Second description"},
+    create_ticket_for_test(
+        client=client,
+        title="Second ticket",
+        description="Second description",
     )
 
     response = client.get("/tickets")
@@ -99,9 +129,142 @@ def test_list_tickets(client: TestClient) -> None:
     assert response.status_code == 200
     data = response.json()
     assert [ticket["title"] for ticket in data] == [
-        "First ticket",
         "Second ticket",
+        "First ticket",
     ]
+
+
+def test_list_tickets_limit_and_offset(client: TestClient) -> None:
+    for title in ("Alpha", "Bravo", "Charlie"):
+        create_ticket_for_test(
+            client=client,
+            title=title,
+            description=f"{title} description",
+        )
+
+    response = client.get(
+        "/tickets",
+        params={
+            "sort_by": "title",
+            "sort_order": "asc",
+            "limit": 1,
+            "offset": 1,
+        },
+    )
+
+    assert response.status_code == 200
+    assert [ticket["title"] for ticket in response.json()] == ["Bravo"]
+
+
+def test_list_tickets_filters_by_status(client: TestClient) -> None:
+    open_ticket_id = create_ticket_for_test(
+        client=client,
+        title="Open ticket",
+        description="Open description",
+    )
+    closed_ticket_id = create_ticket_for_test(
+        client=client,
+        title="Closed ticket",
+        description="Closed description",
+    )
+    update_ticket_fields(open_ticket_id, status="open")
+    update_ticket_fields(closed_ticket_id, status="closed")
+
+    response = client.get("/tickets", params={"status": "closed"})
+
+    assert response.status_code == 200
+    assert [ticket["title"] for ticket in response.json()] == ["Closed ticket"]
+
+
+def test_list_tickets_filters_by_category(client: TestClient) -> None:
+    auth_ticket_id = create_ticket_for_test(
+        client=client,
+        title="Login issue",
+        description="Password reset does not work.",
+    )
+    billing_ticket_id = create_ticket_for_test(
+        client=client,
+        title="Invoice issue",
+        description="Billing details are wrong.",
+    )
+    client.post(f"/tickets/{auth_ticket_id}/analyze")
+    client.post(f"/tickets/{billing_ticket_id}/analyze")
+
+    response = client.get("/tickets", params={"category": "billing"})
+
+    assert response.status_code == 200
+    assert [ticket["title"] for ticket in response.json()] == ["Invoice issue"]
+
+
+def test_list_tickets_filters_by_priority(client: TestClient) -> None:
+    high_ticket_id = create_ticket_for_test(
+        client=client,
+        title="Critical outage",
+        description="The service is down.",
+    )
+    low_ticket_id = create_ticket_for_test(
+        client=client,
+        title="Question",
+        description="I want to update my profile.",
+    )
+    client.post(f"/tickets/{high_ticket_id}/analyze")
+    client.post(f"/tickets/{low_ticket_id}/analyze")
+
+    response = client.get("/tickets", params={"priority": "high"})
+
+    assert response.status_code == 200
+    assert [ticket["title"] for ticket in response.json()] == ["Critical outage"]
+
+
+def test_list_tickets_uses_default_sorting(client: TestClient) -> None:
+    create_ticket_for_test(
+        client=client,
+        title="Older ticket",
+        description="Older description",
+    )
+    create_ticket_for_test(
+        client=client,
+        title="Newer ticket",
+        description="Newer description",
+    )
+
+    response = client.get("/tickets")
+
+    assert response.status_code == 200
+    assert [ticket["title"] for ticket in response.json()] == [
+        "Newer ticket",
+        "Older ticket",
+    ]
+
+
+def test_list_tickets_supports_ascending_sorting(client: TestClient) -> None:
+    create_ticket_for_test(
+        client=client,
+        title="Zulu ticket",
+        description="Zulu description",
+    )
+    create_ticket_for_test(
+        client=client,
+        title="Alpha ticket",
+        description="Alpha description",
+    )
+
+    response = client.get(
+        "/tickets",
+        params={"sort_by": "title", "sort_order": "asc"},
+    )
+
+    assert response.status_code == 200
+    assert [ticket["title"] for ticket in response.json()] == [
+        "Alpha ticket",
+        "Zulu ticket",
+    ]
+
+
+def test_list_tickets_rejects_invalid_sort_by(client: TestClient) -> None:
+    response = client.get("/tickets", params={"sort_by": "id"})
+
+    assert response.status_code == 422
 
 
 def test_get_ticket_by_id(client: TestClient) -> None:
@@ -127,18 +290,6 @@ def test_get_ticket_returns_404_for_missing_ticket(client: TestClient) -> None:
     assert response.json() == {"detail": "Ticket not found"}
 
 
-def create_ticket_for_analysis(
-    client: TestClient,
-    title: str,
-    description: str,
-) -> int:
-    response = client.post(
-        "/tickets",
-        json={"title": title, "description": description},
-    )
-    return int(response.json()["id"])
-
-
 @pytest.mark.parametrize(
     ("title", "description", "expected_category"),
     [
@@ -154,7 +305,7 @@ def test_analyze_ticket_categories(
     description: str,
     expected_category: str,
 ) -> None:
-    ticket_id = create_ticket_for_analysis(
+    ticket_id = create_ticket_for_test(
         client=client,
         title=title,
         description=description,
@@ -180,7 +331,7 @@ def test_analyze_ticket_priorities(
     description: str,
     expected_priority: str,
 ) -> None:
-    ticket_id = create_ticket_for_analysis(
+    ticket_id = create_ticket_for_test(
         client=client,
         title=title,
         description=description,
@@ -200,7 +351,7 @@ def test_analyze_ticket_returns_404_for_missing_ticket(client: TestClient) -> No
 
 
 def test_analyze_ticket_updates_ticket_fields(client: TestClient) -> None:
-    ticket_id = create_ticket_for_analysis(
+    ticket_id = create_ticket_for_test(
         client=client,
         title="Payment failed",
         description="Please help, my invoice payment failed.",

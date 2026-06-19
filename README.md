@@ -4,7 +4,7 @@
 
 - `GET /health` - returns the service health status.
 - `POST /tickets` - creates a ticket from a title and description.
-- `GET /tickets` - returns all tickets.
+- `GET /tickets` - returns tickets with pagination, filtering, and sorting.
 - `GET /tickets/{ticket_id}` - returns one ticket by ID or `404` if it does not exist.
 - `POST /tickets/{ticket_id}/analyze` - applies deterministic local analysis to a ticket.
 
