@@ -7,12 +7,17 @@ human operator can explicitly request classification, priority, a bounded
 summary, and a draft reply. The application supports an offline deterministic
 rule provider and an optional external LLM provider behind the same interface.
 
-> Реализована интеграция с внешним LLM provider; реальный вызов требует
-> пользовательский API key и отдельную проверку.
+The external-provider path was verified with one controlled Groq
+OpenAI-compatible Responses API smoke using synthetic data. That check covered
+strict structured output with local schema validation, PII masking before the
+provider boundary, a stateless request with `store=false`, transparent
+provider/model/fallback audit metadata, and PostgreSQL persistence. The default
+remains `AI_PROVIDER=deterministic`; CI and automated tests never call an
+external AI service. The deterministic provider remains available for offline
+development and tests.
 
-No real-provider smoke test has been performed for this version. The default is
-`AI_PROVIDER=deterministic`; CI and the automated tests never call an external AI
-service.
+See the [provider smoke guide](docs/provider-smoke.md#controlled-real-provider-verification)
+for the verified scope and its limitations.
 
 ## What the project demonstrates
 

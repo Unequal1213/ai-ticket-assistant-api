@@ -109,6 +109,36 @@ and delete it afterward. Revoke the key in Groq Console even if the smoke fails,
 and review Groq Usage to confirm the expected single request/token record. Do not
 place the file in this repository or shell history.
 
+## Controlled real-provider verification
+
+On 2026-08-01, commit
+`99989ee904254399b062e10b2aedfaf8de7a7bbf` was checked with one controlled
+request to the Groq OpenAI-compatible Responses API using model
+`openai/gpt-oss-20b` and synthetic data only. Retries, repairs, and deterministic
+fallback were disabled by the smoke policy.
+
+The verified flow produced these results:
+
+- `POST /tickets` returned HTTP 201 without invoking the provider;
+- one explicit `POST /tickets/{id}/analyze` returned HTTP 200 and produced
+  exactly one provider request;
+- the structured result passed local Pydantic/schema validation;
+- the validated result and bounded audit metadata were persisted in PostgreSQL,
+  and a subsequent ticket read confirmed persistence;
+- outbound PII-masking checks passed before the provider boundary;
+- the Responses request used `store=false`, with no tools, conversation, or
+  `previous_response_id`;
+- the application did not persist the raw provider response or full prompt;
+- log and database safety scans passed; and
+- all disposable Docker resources were removed after verification.
+
+This evidence is deliberately narrow. It covers one provider flow and one model
+at one point in time; provider model availability and limits can change. It is
+not load testing, production SLA verification, an absolute guarantee that every
+class of PII is removed, or proof of immunity to every prompt-injection attack.
+Real customer data still requires separate privacy, legal, and contractual
+review.
+
 ## Limits
 
 A successful smoke validates one provider request for one configured model and
