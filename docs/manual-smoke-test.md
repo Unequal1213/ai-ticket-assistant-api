@@ -1,7 +1,9 @@
 # Manual smoke tests with synthetic data
 
-No real external-provider request was executed while implementing this phase.
-Run the LLM procedure only after a separate explicit decision.
+One controlled external-provider verification is recorded in the
+[provider smoke guide](provider-smoke.md#controlled-real-provider-verification).
+Do not repeat the LLM procedure by default; every additional live run requires a
+separate explicit decision.
 
 ## Offline deterministic demo
 
@@ -35,8 +37,8 @@ Safety prerequisites:
 5. Keep SDK/HTTP debug logging disabled.
 
 Prepare environment variables through a secure local secret mechanism. The
-following placeholders show the required non-secret configuration; they were not
-executed during development:
+following placeholders show the required non-secret configuration. They are not
+authorization to execute another provider request:
 
 ```bash
 AI_PROVIDER=llm
@@ -85,7 +87,7 @@ failure. Record only safe error metadata, then return to deterministic mode. Aft
 the test, revoke or rotate the temporary key, remove it from the local environment,
 and delete the disposable database using an approved local cleanup procedure.
 
-Only after this controlled test succeeds may project text say that the selected
-provider/model was smoke-tested on the recorded date. It still must not claim
+For any future provider/model combination, only a successful controlled test may
+support a dated smoke-tested claim. Such a result still must not be presented as
 perfect accuracy, complete PII removal, autonomous decision-making, or general
 production readiness.

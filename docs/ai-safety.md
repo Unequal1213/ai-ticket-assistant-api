@@ -83,6 +83,28 @@ not contain ticket title/description, email, phone, API key, prompt, or full mod
 response. Avoid enabling verbose third-party HTTP/SDK logging in environments
 that process sensitive input.
 
+## Controlled provider verification
+
+On 2026-08-01, runtime commit
+`99989ee904254399b062e10b2aedfaf8de7a7bbf` completed one controlled smoke using
+the Groq OpenAI-compatible Responses API, model `openai/gpt-oss-20b`, and
+synthetic data only. Ticket creation returned HTTP 201; one explicit analysis
+returned HTTP 200 and caused exactly one provider request. Retries, repair, and
+fallback were disabled.
+
+The strict structured result passed local validation, and PostgreSQL persistence
+and bounded audit metadata were verified. The outbound boundary passed the
+documented PII-masking checks. The request used `store=false` and did not use
+tools, conversation state, or `previous_response_id`. See the
+[provider smoke guide](provider-smoke.md#controlled-real-provider-verification)
+for the procedure, evidence scope, and cleanup record.
+
+This is one controlled integration smoke, not load testing or production SLA
+verification. It does not guarantee removal of every kind of PII or protection
+against every prompt-injection attack, and it does not authorize processing real
+customer data. Provider/model availability and limits can change. Real data
+requires separate privacy, legal, and contractual review.
+
 ## Operational limitations
 
 - Daily quota and concurrency are per process, not distributed.
@@ -92,8 +114,6 @@ that process sensitive input.
 - No monetary price is hard-coded or estimated.
 - A configurable base URL does not prove every OpenAI-compatible service supports
   the same structured-output behavior.
-- The external integration has not received a controlled real-provider smoke test
-  in this development phase.
 - `AI_MODEL` must be selected explicitly; availability and cost depend on the
   operator's provider/account configuration.
 - `AI_BASE_URL` is the only supported endpoint override. SDK-specific
