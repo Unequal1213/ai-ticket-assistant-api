@@ -6,6 +6,12 @@ on:
 
 env:
   PYTHONPATH: ${{ github.workspace }}
+  PYTHON_DOTENV_DISABLED: "1"
+  AI_PROVIDER: deterministic
+  DATABASE_URL: sqlite+pysqlite:////tmp/ai-ticket-assistant-ci.db
+
+permissions:
+  contents: read
 
 jobs:
   test:
@@ -27,7 +33,15 @@ jobs:
           python -m pip install -r requirements-dev.txt
 
       - name: Run Ruff
-        run: python -m ruff check .
+        run: |
+          python -m ruff check .
+          python -m ruff format --check .
+
+      - name: Check migrations
+        run: |
+          python -m alembic upgrade head
+          python -m alembic downgrade base
+          python -m alembic upgrade head
 
       - name: Run Pytest
         run: python -m pytest

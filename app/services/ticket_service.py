@@ -6,7 +6,6 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.schemas.ticket import TicketCreate, TicketUpdate
-from app.services.ticket_analyzer import analyze_ticket
 
 if TYPE_CHECKING:
     from app.models.ticket import Ticket
@@ -97,22 +96,3 @@ def delete_ticket(db: Session, ticket_id: int) -> bool:
     db.delete(ticket)
     db.commit()
     return True
-
-
-def analyze_existing_ticket(db: Session, ticket_id: int) -> Ticket | None:
-    ticket = get_ticket(db=db, ticket_id=ticket_id)
-    if ticket is None:
-        return None
-
-    analysis = analyze_ticket(
-        title=ticket.title,
-        description=ticket.description,
-    )
-    ticket.category = analysis.category
-    ticket.priority = analysis.priority
-    ticket.summary = analysis.summary
-    ticket.suggested_reply = analysis.suggested_reply
-
-    db.commit()
-    db.refresh(ticket)
-    return ticket
