@@ -5,8 +5,14 @@ from typing import TYPE_CHECKING, Annotated, Literal
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.database.dependencies import get_db
-from app.schemas.ticket import TicketCreate, TicketResponse, TicketUpdate
+from app.ai.dependencies import TicketAnalysisServiceDependency
+from app.database.dependencies import SessionFactoryDependency, get_db
+from app.schemas.ticket import (
+    AnalysisErrorResponse,
+    TicketCreate,
+    TicketResponse,
+    TicketUpdate,
+)
 from app.services import ticket_service
 
 if TYPE_CHECKING:
@@ -102,9 +108,27 @@ def delete_ticket(ticket_id: int, db: DbSession) -> None:
         )
 
 
-@router.post("/tickets/{ticket_id}/analyze", response_model=TicketResponse)
-def analyze_ticket(ticket_id: int, db: DbSession) -> Ticket:
-    ticket = ticket_service.analyze_existing_ticket(db=db, ticket_id=ticket_id)
+@router.post(
+    "/tickets/{ticket_id}/analyze",
+    response_model=TicketResponse,
+    responses={
+        413: {"model": AnalysisErrorResponse},
+        409: {"model": AnalysisErrorResponse},
+        429: {"model": AnalysisErrorResponse},
+        502: {"model": AnalysisErrorResponse},
+        503: {"model": AnalysisErrorResponse},
+        504: {"model": AnalysisErrorResponse},
+    },
+)
+async def analyze_ticket(
+    ticket_id: int,
+    session_factory: SessionFactoryDependency,
+    analysis_service: TicketAnalysisServiceDependency,
+) -> Ticket:
+    ticket = await analysis_service.analyze_existing_ticket(
+        session_factory=session_factory,
+        ticket_id=ticket_id,
+    )
     if ticket is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

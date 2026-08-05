@@ -1,6 +1,10 @@
-from collections.abc import Generator
+from collections.abc import Callable, Generator
+from typing import Annotated
 
+from fastapi import Depends
 from sqlalchemy.orm import Session
+
+SessionFactory = Callable[[], Session]
 
 
 def get_db() -> Generator[Session]:
@@ -11,3 +15,14 @@ def get_db() -> Generator[Session]:
         yield db
     finally:
         db.close()
+
+
+def get_session_factory() -> SessionFactory:
+    """Return the factory without opening a connection or transaction."""
+
+    from app.database.database import SessionLocal
+
+    return SessionLocal
+
+
+SessionFactoryDependency = Annotated[SessionFactory, Depends(get_session_factory)]

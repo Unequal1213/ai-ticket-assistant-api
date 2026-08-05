@@ -9,8 +9,9 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.database.dependencies import get_db
+from app.database.dependencies import get_db, get_session_factory
 from app.main import app
+from app.schemas.ticket import MAX_TICKET_DESCRIPTION_CHARS
 
 DATABASE_MODULES = (
     "app.models.ticket",
@@ -53,6 +54,7 @@ def client(monkeypatch: pytest.MonkeyPatch) -> Generator[TestClient]:
             db.close()
 
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_session_factory] = lambda: testing_session_local
 
     try:
         with TestClient(app) as test_client:
@@ -110,6 +112,21 @@ def test_create_ticket(client: TestClient) -> None:
     assert data["suggested_reply"] is None
     assert data["created_at"]
     assert data["updated_at"]
+
+
+def test_create_ticket_rejects_description_above_storage_limit(
+    client: TestClient,
+) -> None:
+    response = client.post(
+        "/tickets",
+        json={
+            "title": "Oversized synthetic ticket",
+            "description": "x" * (MAX_TICKET_DESCRIPTION_CHARS + 1),
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["type"] == "string_too_long"
 
 
 def test_list_tickets_default_behavior(client: TestClient) -> None:
@@ -513,3 +530,10 @@ def test_analyze_ticket_updates_ticket_fields(client: TestClient) -> None:
     assert saved_ticket["priority"] == analyzed_ticket["priority"]
     assert saved_ticket["summary"] == analyzed_ticket["summary"]
     assert saved_ticket["suggested_reply"] == analyzed_ticket["suggested_reply"]
+    assert analyzed_ticket["provider_requested"] == "deterministic"
+    assert analyzed_ticket["provider_used"] == "deterministic"
+    assert analyzed_ticket["fallback_used"] is False
+    assert analyzed_ticket["model_requested"] is None
+    assert analyzed_ticket["model_used"] is None
+    assert analyzed_ticket["provider_attempts"] == 0
+    assert analyzed_ticket["repair_attempts"] == 0
